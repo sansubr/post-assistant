@@ -11,6 +11,9 @@
     h1 {
       font-size: 16px;
     }
+    #message {
+        margin: 10px 0;
+    }
     button {
       width: 100%;
       padding: 10px;
@@ -21,12 +24,16 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
   <h1>LinkedIn-ify by Get Strategiq</h1>
-  <p>Use the entire page as context for your post.</p>
-  <button id="action-button">Make Post</button>
+  <div id="message"></div>
+  <button id="action-button" disabled>Loading...</button>
   <script src="popup.js"></script>
 </body>
 </html>
