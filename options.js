@@ -1,67 +1,63 @@
-const providerSelect = document.getElementById('ai-provider');
-const saveButton = document.getElementById('save-button');
-const statusDiv = document.getElementById('status');
+document.addEventListener('DOMContentLoaded', () => {
+  const providerSelect = document.getElementById('provider-select');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const addKeyButton = document.getElementById('add-key-button');
+  const keyList = document.getElementById('key-list');
 
-const providerFields = {
-  google: document.getElementById('google-fields'),
-  openai: document.getElementById('openai-fields'),
-  anthropic: document.getElementById('anthropic-fields')
-};
+  const providers = ['google', 'openai', 'anthropic'];
 
-const inputs = {
-  googleModel: document.getElementById('google-model'),
-  openaiModel: document.getElementById('openai-model'),
-  anthropicModel: document.getElementById('anthropic-model'),
-  googleApiKey: document.getElementById('google-api-key'),
-  openaiApiKey: document.getElementById('openai-api-key'),
-  anthropicApiKey: document.getElementById('anthropic-api-key')
-};
-
-function toggleProviderFields() {
-  const selectedProvider = providerSelect.value;
-  for (const provider in providerFields) {
-    providerFields[provider].style.display = provider === selectedProvider ? 'block' : 'none';
-  }
-}
-
-function saveOptions() {
-  const settings = {
-    selectedProvider: providerSelect.value,
-    googleModel: inputs.googleModel.value,
-    openaiModel: inputs.openaiModel.value,
-    anthropicModel: inputs.anthropicModel.value,
-    googleApiKey: inputs.googleApiKey.value,
-    openaiApiKey: inputs.openaiApiKey.value,
-    anthropicApiKey: inputs.anthropicApiKey.value
+  // Function to render keys for the selected provider
+  const renderKeys = (provider) => {
+    chrome.storage.local.get([`${provider}ApiKeys`], (result) => {
+      const keys = result[`${provider}ApiKeys`] || [];
+      keyList.innerHTML = '';
+      keys.forEach((key, index) => {
+        const li = document.createElement('li');
+        li.textContent = `Key ${index + 1}: ****${key.slice(-4)}`;
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', () => {
+          deleteKey(provider, index);
+        });
+        li.appendChild(deleteButton);
+        keyList.appendChild(li);
+      });
+    });
   };
 
-  chrome.storage.local.set(settings, () => {
-    statusDiv.textContent = 'Settings saved.';
-    setTimeout(() => { statusDiv.textContent = ''; }, 1500);
-  });
-}
+  // Function to add a new key
+  const addKey = (provider, key) => {
+    if (!key) return;
+    chrome.storage.local.get([`${provider}ApiKeys`], (result) => {
+      const keys = result[`${provider}ApiKeys`] || [];
+      keys.push(key);
+      chrome.storage.local.set({ [`${provider}ApiKeys`]: keys }, () => {
+        apiKeyInput.value = '';
+        renderKeys(provider);
+      });
+    });
+  };
 
-function restoreOptions() {
-  const keysToGet = [
-    'selectedProvider', 'googleModel', 'openaiModel', 'anthropicModel',
-    'googleApiKey', 'openaiApiKey', 'anthropicApiKey'
-  ];
-  chrome.storage.local.get(keysToGet, (items) => {
-    providerSelect.value = items.selectedProvider || 'google';
-    
-    // --- CORRECTED DEFAULT VALUES ---
-    inputs.googleModel.value = items.googleModel || 'gemini-2.5-pro';
-    inputs.openaiModel.value = items.openaiModel || 'gpt-4o';
-    inputs.anthropicModel.value = items.anthropicModel || 'claude-sonnet-4-20250514';
-    
-    inputs.googleApiKey.value = items.googleApiKey || '';
-    inputs.openaiApiKey.value = items.openaiApiKey || '';
-    inputs.anthropicApiKey.value = items.anthropicApiKey || '';
-    
-    toggleProviderFields();
-  });
-}
+  // Function to delete a key
+  const deleteKey = (provider, index) => {
+    chrome.storage.local.get([`${provider}ApiKeys`], (result) => {
+      const keys = result[`${provider}ApiKeys`] || [];
+      keys.splice(index, 1);
+      chrome.storage.local.set({ [`${provider}ApiKeys`]: keys }, () => {
+        renderKeys(provider);
+      });
+    });
+  };
 
-providerSelect.addEventListener('change', toggleProviderFields);
-saveButton.addEventListener('click', saveOptions);
-document.addEventListener('DOMContentLoaded', restoreOptions);
+  // Event Listeners
+  providerSelect.addEventListener('change', () => {
+    renderKeys(providerSelect.value);
+  });
+
+  addKeyButton.addEventListener('click', () => {
+    addKey(providerSelect.value, apiKeyInput.value.trim());
+  });
+
+  // Initial render
+  renderKeys(providerSelect.value);
+});

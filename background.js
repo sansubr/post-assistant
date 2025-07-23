@@ -56,10 +56,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 // Clean up when a tab is closed
-chrome.tabs.onRemoved.addListener((tabId) => {
+chrome.tabs.onRemoved.addListener(async (tabId) => {
   processedTabs.delete(tabId);
   chrome.storage.local.remove([`transcript_${tabId}`]);
-  chrome.action.setBadgeText({ tabId: tabId, text: '' });
+  try {
+    await chrome.action.setBadgeText({ tabId: tabId, text: '' });
+  } catch (error) {
+    // This error is expected if the tab is closed before the badge is cleared,
+    // especially during a browser shutdown. We can safely ignore it.
+    if (error.message.includes('No tab with id') || error.message.includes('Invalid tab ID')) {
+        // Suppress error
+    } else {
+        console.error(`Error clearing badge for tab ${tabId}:`, error);
+    }
+  }
 });
 
 
@@ -126,11 +136,15 @@ async function handleProcessTranscriptUrl(transcriptUrl, tabId) {
     await chrome.storage.local.set({ [`transcript_${tabId}`]: fullTranscript });
 
     // Update the extension icon to show it's ready
-    chrome.action.setBadgeText({ tabId: tabId, text: 'Ready' });
-    chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: '#4CAF50' });
+    await chrome.action.setBadgeText({ tabId: tabId, text: 'Ready' });
+    await chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: '#4CAF50' });
     showNotification("Transcript captured! Click the extension icon to create a post.");
 
   } catch (error) {
-    console.error("Error processing transcript:", error);
+    if (error.message.includes('No tab with id') || error.message.includes('Invalid tab ID')) {
+      console.log(`Tab ${tabId} was closed before transcript processing could complete.`);
+    } else {
+      console.error("Error processing transcript:", error);
+    }
   }
 }

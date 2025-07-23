@@ -6,6 +6,10 @@
 </head>
 <body>
   <div class="container">
+    <div class="header-links">
+      <a href="options.html" target="_blank">API Keys</a>
+      <a href="history.html" target="_blank">History</a>
+    </div>
     <h1>AI Post Assistant</h1>
     
     <div class="editor-grid">
@@ -29,6 +33,11 @@
                 <option value="mentor">Mentor ("Here's what you need to know")</option>
                 <option value="santosh">Santosh ("Here's what you need to know")</option>
             </select>
+        </div>
+
+        <div class="form-group">
+          <label for="model-select">Select a Model:</label>
+          <select id="model-select"></select>
         </div>
 
         <button id="create-post-button">Create Post</button>

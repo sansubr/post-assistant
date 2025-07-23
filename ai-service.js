@@ -37,13 +37,12 @@ async function callOpenAiApi(apiKey, model, sourcePlainText, style) {
 
 async function callAnthropicApi(apiKey, model, sourcePlainText, style) {
   const { systemPrompt, userPrompt } = await getPrompts(style, sourcePlainText);
-  const response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' }, body: JSON.stringify({ model: model, max_tokens: 2048, system: systemPrompt, messages: [{ "role": "user", content: userPrompt }] }) });
+  const response = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: model, max_tokens: 2048, system: systemPrompt, messages: [{ "role": "user", content: userPrompt }] }) });
   if (!response.ok) throw new Error((await response.json()).error.message);
   const data = await response.json();
   return data.content[0].text;
 }
 
-// The main dispatcher function remains the same
 export async function generatePost(provider, apiKey, model, style, sourcePlainText) {
   switch (provider) {
     case 'google':

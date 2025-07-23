@@ -37,7 +37,7 @@
   "options_page": "options.html",
   "web_accessible_resources": [
     {
-      "resources": ["libs/Readability.js"],
+      "resources": ["libs/Readability.js", "history.html"],
       "matches": ["<all_urls>"]
     }
   ]

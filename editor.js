@@ -1,18 +1,37 @@
 import { generatePost } from './ai-service.js';
-import { formatForLinkedIn } from '/formatter.js';
+import { formatForLinkedIn } from './formatter.js';
 
 window.addEventListener('DOMContentLoaded', () => {
   const sourceContentDiv = document.getElementById('source-content');
   const aiTextarea = document.getElementById('ai-post-content');
   const createPostButton = document.getElementById('create-post-button');
   const copyButton = document.getElementById('copy-button');
-  const styleSelect = document.getElementById('prompt-style'); // Get the new dropdown
+  const styleSelect = document.getElementById('prompt-style');
+  const modelSelect = document.getElementById('model-select');
 
-  chrome.storage.local.get('pageContent', async (data) => {
-    console.log("Data retrieved from storage in editor.js:", data); // ADDED: Inspect the data
+  const models = {
+    google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
+    openai: ['gpt-4.1-mini-2025-04-14', 'gpt-4.1-2025-04-14', 'gpt-4o-2024-08-06'],
+    anthropic: ['claude-3-opus-20240229', 'claude-sonnet-4-20250514', ]
+  };
+
+  // Populate the model dropdown
+  for (const provider in models) {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = provider.charAt(0).toUpperCase() + provider.slice(1);
+    models[provider].forEach(model => {
+      const option = document.createElement('option');
+      option.value = `${provider}:${model}`;
+      option.textContent = model;
+      optgroup.appendChild(option);
+    });
+    modelSelect.appendChild(optgroup);
+  }
+
+  chrome.storage.local.get('pageContent', (data) => {
     if (data.pageContent) {
       sourceContentDiv.innerHTML = data.pageContent.replace(/<img[^>]*>/g, '');
-      await chrome.storage.local.remove('pageContent'); // Also making this async to avoid potential race conditions
+      chrome.storage.local.remove('pageContent');
     } else {
       sourceContentDiv.textContent = 'Could not load content from the page. Please try again from the source page.';
     }
@@ -20,42 +39,42 @@ window.addEventListener('DOMContentLoaded', () => {
 
   createPostButton.addEventListener('click', async () => {
     const sourcePlainText = sourceContentDiv.innerText;
-    const selectedStyle = styleSelect.value; // Get the selected style
-    
-    if (!sourcePlainText.trim()) { /* ... same as before ... */ }
+    const selectedStyle = styleSelect.value;
+    const [provider, model] = modelSelect.value.split(':');
 
-    aiTextarea.value = "Getting settings and generating post...";
+    if (!sourcePlainText.trim()) {
+      aiTextarea.value = 'Source content is empty.';
+      return;
+    }
+
+    aiTextarea.value = "Generating post...";
     createPostButton.disabled = true;
     createPostButton.textContent = 'Generating...';
 
-    const keysToGet = [ 'selectedProvider', 'googleModel', 'openaiModel', 'anthropicModel', 'googleApiKey', 'openaiApiKey', 'anthropicApiKey' ];
-    
-    chrome.storage.local.get(keysToGet, async (items) => {
-      const provider = items.selectedProvider || 'google';
-      const apiKeys = {
-        google: items.googleApiKey,
-        openai: items.openaiApiKey,
-        anthropic: items.anthropicApiKey
-      };
-      const models = {
-        google: items.googleModel,
-        openai: items.openaiModel,
-        anthropic: items.anthropicModel
-      };
-      const apiKey = apiKeys[provider];
-      const model = models[provider];
-
-      if (!apiKey) {
-        aiTextarea.value = `API key for AI is not set. Please go to the extension options to set it.`;
+    chrome.storage.local.get([`${provider}ApiKeys`], async (items) => {
+      const apiKeys = items[`${provider}ApiKeys`];
+      if (!apiKeys || apiKeys.length === 0) {
+        aiTextarea.value = `No API key found for ${provider}. Please add one in the options.`;
         createPostButton.disabled = false;
         createPostButton.textContent = 'Create Post';
         return;
       }
+
+      // For simplicity, using the first available key
+      const apiKey = apiKeys[0];
+
       try {
-        // Pass the new 'selectedStyle' to our universal AI function
         const aiGeneratedText = await generatePost(provider, apiKey, model, selectedStyle, sourcePlainText);
         const formattedText = formatForLinkedIn(aiGeneratedText.trim());
         aiTextarea.value = formattedText;
+
+        // Save to history
+        chrome.storage.local.get(['postHistory'], (result) => {
+          const history = result.postHistory || [];
+          history.push({ content: formattedText, timestamp: new Date().toISOString() });
+          chrome.storage.local.set({ postHistory: history });
+        });
+
       } catch (error) {
         console.error('Error:', error);
         aiTextarea.value = `Failed to generate post. ${error.message}`;
@@ -67,19 +86,9 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   copyButton.addEventListener('click', () => {
-    const textToCopy = aiTextarea.value;
-    if (!textToCopy) return;
-
-    navigator.clipboard.writeText(textToCopy).then(() => {
-      const originalText = copyButton.textContent;
+    navigator.clipboard.writeText(aiTextarea.value).then(() => {
       copyButton.textContent = 'Copied!';
-      copyButton.style.backgroundColor = '#28a745'; // Green for success
-      setTimeout(() => {
-        copyButton.textContent = originalText;
-        copyButton.style.backgroundColor = ''; // Revert to default
-      }, 2000);
-    }).catch(err => {
-      console.error('Failed to copy text: ', err);
+      setTimeout(() => { copyButton.textContent = 'Copy Post'; }, 2000);
     });
   });
 });
