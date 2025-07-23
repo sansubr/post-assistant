@@ -8,6 +8,27 @@ window.addEventListener('DOMContentLoaded', () => {
   const copyButton = document.getElementById('copy-button');
   const styleSelect = document.getElementById('prompt-style');
   const modelSelect = document.getElementById('model-select');
+  const wordCountDisplay = document.getElementById('word-count-display');
+
+  const MAX_WORDS = 3000;
+
+  function updateWordCount() {
+    const text = sourceContentDiv.innerText;
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    wordCountDisplay.textContent = `Word count: ${wordCount} / ${MAX_WORDS}`;
+
+    if (wordCount > MAX_WORDS) {
+      wordCountDisplay.style.color = 'red';
+      createPostButton.disabled = true;
+      aiTextarea.value = `Source content is too long (${wordCount} words). Please reduce it to ${MAX_WORDS} words or less.`;
+    } else {
+      wordCountDisplay.style.color = '';
+      createPostButton.disabled = false;
+      if (aiTextarea.value.startsWith('Source content is too long')) {
+        aiTextarea.value = ''; // Clear the warning if user reduced text
+      }
+    }
+  }
 
   const models = {
     google: ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro'],
@@ -28,6 +49,7 @@ window.addEventListener('DOMContentLoaded', () => {
     modelSelect.appendChild(optgroup);
   }
 
+  // Initial population and word count check
   chrome.storage.local.get('pageContent', (data) => {
     if (data.pageContent) {
       sourceContentDiv.innerHTML = data.pageContent.replace(/<img[^>]*>/g, '');
@@ -35,9 +57,16 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
       sourceContentDiv.textContent = 'Could not load content from the page. Please try again from the source page.';
     }
+    updateWordCount(); // Initial word count check
   });
 
+  // Update word count on input
+  sourceContentDiv.addEventListener('input', updateWordCount);
+
   createPostButton.addEventListener('click', async () => {
+    if (createPostButton.disabled) {
+      return; // Do nothing if the button is disabled
+    }
     const sourcePlainText = sourceContentDiv.innerText;
     const selectedStyle = styleSelect.value;
     const [provider, model] = modelSelect.value.split(':');
