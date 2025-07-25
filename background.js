@@ -1,3 +1,6 @@
+import { auth } from './firebase-init.js';
+import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
+
 // =================================================================
 // Global State
 // =================================================================
@@ -55,6 +58,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onMessageExternal.addListener(
+  function(request, sender, sendResponse) {
+    // Check if the message contains the auth token
+    if (request.token) {
+      console.log("Received token from web app:", request.token);
+
+      // Sign in to Firebase with the received ID token
+      const credential = GoogleAuthProvider.credential(request.token);
+      signInWithCredential(auth, credential)
+        .then(() => {
+          console.log('Firebase sign-in successful in background script.');
+          // Store the token securely in the extension's local storage
+          chrome.storage.local.set({ 'firebaseIdToken': request.token }, function() {
+            if (chrome.runtime.lastError) {
+              console.error('Error setting token:', chrome.runtime.lastError);
+              sendResponse({ success: false, error: 'Could not save token.' });
+            } else {
+              console.log('Token saved successfully.');
+              sendResponse({ success: true });
+            }
+          });
+        })
+        .catch(error => {
+          console.error('Firebase sign-in failed in background script:', error);
+          sendResponse({ success: false, error: 'Firebase sign-in failed.' });
+        });
+
+      // Return true to indicate you wish to send a response asynchronously
+      return true;
+    } else if (request.action === 'logout') {
+      console.log('Received logout message from web app.');
+      auth.signOut()
+        .then(() => {
+          console.log('Firebase sign-out successful in background script.');
+          chrome.storage.local.remove('firebaseIdToken', function() {
+            if (chrome.runtime.lastError) {
+              console.error('Error removing token from storage:', chrome.runtime.lastError);
+            }
+            sendResponse({ success: true });
+          });
+        })
+        .catch(error => {
+          console.error('Firebase sign-out failed in background script:', error);
+          sendResponse({ success: false, error: 'Firebase sign-out failed.' });
+        });
+      return true;
+    }
+  }
+);
+
 // Clean up when a tab is closed
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   processedTabs.delete(tabId);
@@ -78,12 +131,21 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 // =================================================================
 chrome.webRequest.onBeforeRequest.addListener(
   async (details) => {
+    console.log('webRequest.onBeforeRequest triggered for:', details.url);
     try {
       const tab = await chrome.tabs.get(details.tabId);
-      if (!tab.url || !tab.url.includes("youtube.com/watch?v=")) return;
-      if (processedTabs.has(details.tabId)) return;
+      console.log('Tab details obtained:', tab);
+      if (!tab.url || !tab.url.includes("youtube.com/watch?v=")) {
+        console.log('Not a YouTube video page or missing URL. Returning.');
+        return;
+      }
+      if (processedTabs.has(details.tabId)) {
+        console.log('Tab already processed. Returning.');
+        return;
+      }
 
       processedTabs.add(details.tabId);
+      console.log('Processing transcript URL:', details.url, 'for tabId:', details.tabId);
       handleProcessTranscriptUrl(details.url, details.tabId); // Pass tabId
 
     } catch (error) {
@@ -100,6 +162,7 @@ chrome.webRequest.onBeforeRequest.addListener(
 
 async function handleCreatePostFromPage(tabId) {
   try {
+    console.log('handleCreatePostFromPage called for tabId:', tabId);
     await chrome.scripting.executeScript({
       target: { tabId: tabId },
       files: ["libs/Readability.js"],
@@ -109,9 +172,11 @@ async function handleCreatePostFromPage(tabId) {
       func: getArticleContent,
     });
     if (extractionResult && extractionResult.result) {
+      console.log('Article content extracted. Setting to storage.');
       await chrome.storage.local.set({ pageContent: extractionResult.result });
       await chrome.tabs.create({ url: "editor.html" });
     } else {
+      console.log('Failed to extract article content.');
       showNotification("Failed to extract article content.");
     }
   } catch (error) {
@@ -120,25 +185,32 @@ async function handleCreatePostFromPage(tabId) {
 }
 
 async function handleProcessTranscriptUrl(transcriptUrl, tabId) {
+  console.log('handleProcessTranscriptUrl called with URL:', transcriptUrl, 'and tabId:', tabId);
   try {
     const url = new URL(transcriptUrl);
     url.searchParams.set('fmt', 'json3');
+    console.log('Fetching transcript from:', url.href);
 
     const response = await fetch(url.href);
+    console.log('Transcript fetch response status:', response.status);
     const jsonData = await response.json();
+    console.log('Transcript JSON data received.');
 
     const fullTranscript = jsonData.events
       .filter(e => e.segs)
       .map(e => e.segs.map(s => s.utf8).join(''))
       .join(' ');
+    console.log('Full transcript generated. Length:', fullTranscript.length);
 
     // Save transcript to storage, associated with the tabId
     await chrome.storage.local.set({ [`transcript_${tabId}`]: fullTranscript });
+    console.log(`Transcript saved to storage for tab ${tabId}.`);
 
     // Update the extension icon to show it's ready
     await chrome.action.setBadgeText({ tabId: tabId, text: 'Ready' });
     await chrome.action.setBadgeBackgroundColor({ tabId: tabId, color: '#4CAF50' });
     showNotification("Transcript captured! Click the extension icon to create a post.");
+    console.log('Badge updated and notification shown.');
 
   } catch (error) {
     if (error.message.includes('No tab with id') || error.message.includes('Invalid tab ID')) {

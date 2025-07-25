@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Get Strategiq AI Post Assistant",
+  "name": "Blinkpost",
   "version": "0.1",
-  "description": "Helps create LinkedIn posts from any webpage.",
+  "description": "Helps create LinkedIn posts from any article or YouTube video.",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -15,11 +15,18 @@
     "<all_urls>",
     "*://*.anthropic.com/*",
     "*://*.youtube.com/*",
-    "*://www.youtube.com/api/timedtext*"
+    "*://www.youtube.com/api/timedtext*",
+    "*://*.firebaseio.com/*",
+    "*://*.googleapis.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.bundle.js"
   },
+  "externally_connectable": {
+      "matches": [
+        "https://blinkpost-ed598.web.app/*"
+      ]
+    },
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -28,17 +35,15 @@
       "128": "icons/icon128.png"
     }
   },
-  
-  "icons": {
-    "16": "icons/icon16.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
-  },
   "options_page": "options.html",
   "web_accessible_resources": [
     {
       "resources": ["libs/Readability.js", "history.html"],
       "matches": ["<all_urls>"]
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';"
+
+  }
 }
