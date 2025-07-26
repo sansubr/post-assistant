@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Blinkpost",
   "version": "0.1",
-  "description": "Helps create LinkedIn posts from any article or YouTube video.",
+  "description": "Create LinkedIn posts from any article or YouTube video.",
   "permissions": [
     "activeTab",
     "contextMenus",
@@ -24,7 +24,7 @@
   },
   "externally_connectable": {
       "matches": [
-        "https://blinkpost-ed598.web.app/*"
+        "https://blinkpost.getstrategiq.com/*"
       ]
     },
   "action": {

@@ -39929,7 +39929,7 @@ const messageDiv = document.getElementById('message');
 googleButton.addEventListener('click', async () => {
   messageDiv.textContent = ''; // Clear previous messages
   // Redirect to your web application's login page
-  chrome.tabs.create({ url: 'https://blinkpost-ed598.web.app/login.html' });
+  chrome.tabs.create({ url: 'https://blinkpost.getstrategiq.com/login.html' });
   window.close();
 });
 })();

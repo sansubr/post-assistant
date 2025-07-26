@@ -39935,7 +39935,7 @@ const processedTabs = new Set();
 function showNotification(message) {
   chrome.notifications.create({
     type: 'basic', iconUrl: 'icons/icon128.png',
-    title: 'Get Strategiq AI Assistant', message: message
+    title: 'Blinkpost', message: message
   });
 }
 
@@ -39949,15 +39949,17 @@ function getArticleContent() {
 // Event Listeners (Setup)
 // =================================================================
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "strategiq-post-assistant",
-    title: "Create AI Post from this Page",
-    contexts: ["page"],
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "blinkpost",
+      title: "Create AI Post from this Page",
+      contexts: ["page"],
+    });
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "strategiq-post-assistant") {
+  if (info.menuItemId === "blinkpost") {
     handleCreatePostFromPage(tab.id);
   }
 });
@@ -39981,15 +39983,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 chrome.runtime.onMessageExternal.addListener(
   function(request, sender, sendResponse) {
-    // Check if the message contains the auth token
-    if (request.token) {
-      console.log("Received token from web app:", request.token);
+    if (request.token && request.type) {
+      let authPromise;
 
-      // Sign in to Firebase with the received ID token
-      const credential = firebase_auth__WEBPACK_IMPORTED_MODULE_1__.GoogleAuthProvider.credential(request.token);
-      (0,firebase_auth__WEBPACK_IMPORTED_MODULE_1__.signInWithCredential)(_firebase_init_js__WEBPACK_IMPORTED_MODULE_0__.auth, credential)
-        .then(() => {
-          console.log('Firebase sign-in successful in background script.');
+      if (request.type === 'google') {
+        // This is a Google ID Token from the web app's direct Google Sign-In
+        const googleIdToken = request.token;
+        const credential = firebase_auth__WEBPACK_IMPORTED_MODULE_1__.GoogleAuthProvider.credential(googleIdToken);
+        authPromise = (0,firebase_auth__WEBPACK_IMPORTED_MODULE_1__.signInWithCredential)(_firebase_init_js__WEBPACK_IMPORTED_MODULE_0__.auth, credential);
+      } else if (request.type === 'firebase') {
+        // This is a Firebase ID Token from the web app's email/password sign-in/sign-up
+        const firebaseIdToken = request.token;
+        authPromise = (0,firebase_auth__WEBPACK_IMPORTED_MODULE_1__.signInWithCustomToken)(_firebase_init_js__WEBPACK_IMPORTED_MODULE_0__.auth, firebaseIdToken);
+      } else {
+        console.error("Unknown token type received:", request.type);
+        sendResponse({ success: false, error: "Unknown token type" });
+        return true;
+      }
+
+      authPromise
+        .then((userCredential) => {
+          console.log("Firebase sign-in successful in background script:", userCredential.user);
           // Store the token securely in the extension's local storage
           chrome.storage.local.set({ 'firebaseIdToken': request.token }, function() {
             if (chrome.runtime.lastError) {
@@ -40001,13 +40015,11 @@ chrome.runtime.onMessageExternal.addListener(
             }
           });
         })
-        .catch(error => {
-          console.error('Firebase sign-in failed in background script:', error);
-          sendResponse({ success: false, error: 'Firebase sign-in failed.' });
+        .catch((error) => {
+          console.error("Firebase sign-in failed in background script:", error);
+          sendResponse({ success: false, error: error.message });
         });
-
-      // Return true to indicate you wish to send a response asynchronously
-      return true;
+      return true; // Indicate that we will send a response asynchronously
     } else if (request.action === 'logout') {
       console.log('Received logout message from web app.');
       _firebase_init_js__WEBPACK_IMPORTED_MODULE_0__.auth.signOut()

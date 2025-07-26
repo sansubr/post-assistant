@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       actionButton.textContent = "Login / Sign Up";
       actionButton.disabled = false;
       actionButton.onclick = () => {
-        chrome.tabs.create({ url: 'https://blinkpost-ed598.web.app/login.html' });
+        chrome.tabs.create({ url: 'https://blinkpost.getstrategiq.com/login.html' });
         window.close();
       };
     }
